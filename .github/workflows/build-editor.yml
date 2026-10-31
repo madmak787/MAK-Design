@@ -1,0 +1,73 @@
+name: Build floral FigCraft editor
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FIGCRAFT_DEFAULT_SERVER: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/figcraft
+          ref: 76f520ffaaab73fcacf14dfaf30f29272ec178cb
+          path: vendor-source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: storytold/craft-fonts
+          path: craft-fonts
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor-source
+      - name: Install verified Trunk binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/mak-trunk
+          gh release download v0.22.1 -R trunk-rs/trunk -p trunk-x86_64-unknown-linux-gnu.tar.gz -p trunk-x86_64-unknown-linux-gnu.tar.gz.sha256 -D /tmp/mak-trunk
+          cd /tmp/mak-trunk
+          sha256sum -c trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
+          tar -xzf trunk-x86_64-unknown-linux-gnu.tar.gz
+          sudo install trunk /usr/local/bin/trunk
+      - name: Apply source theme and verify startup regression tests
+        run: |
+          python3 scripts/theme-editor.py vendor-source
+          node --test tests/editor-session.test.cjs
+          git -C vendor-source diff --check
+          git -C craft-fonts rev-parse HEAD > FONT-SOURCE.txt
+      - name: Build themed browser editor
+        working-directory: vendor-source/apps/figcraft-web
+        run: trunk build --release --locked
+      - name: Package editor with notices and source patch
+        run: |
+          mkdir -p bundle/editor
+          cp -R vendor-source/dist/web/. bundle/editor/
+          cp vendor-source/LICENSE-MIT vendor-source/LICENSE-APACHE vendor-source/NOTICE vendor-source/ATTRIBUTION.md bundle/editor/
+          cp scripts/theme-editor.py bundle/
+          cp FONT-SOURCE.txt bundle/
+          find craft-fonts -name 'OFL*.txt' -exec cp -n {} bundle/editor/ \;
+          printf '%s\n' 'Modified UI theme for MAK Design. Based on FigCraft v0.13.1, upstream source commit 76f520ffaaab73fcacf14dfaf30f29272ec178cb. UI palette modified; document paint unchanged. Reproduce using scripts/theme-editor.py and this workflow.' > bundle/BUILD-NOTICE.txt
+          cd bundle
+          zip -qr ../mak-floral-editor-v1.zip .
+          cd ..
+          sha256sum mak-floral-editor-v1.zip > mak-floral-editor-v1.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: floral-editor
+          path: |
+            mak-floral-editor-v1.zip
+            mak-floral-editor-v1.zip.sha256
+          retention-days: 30
+      - name: Publish reproducible editor package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create mak-floral-editor-v1 mak-floral-editor-v1.zip mak-floral-editor-v1.zip.sha256 --title 'MAK floral editor v1' --notes 'FigCraft 0.13.1 with original MAK floral UI tokens. Source patch and build workflow are included; original licenses and attribution are retained.' --target "$GITHUB_SHA"

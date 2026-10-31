@@ -41,7 +41,10 @@ class API(unittest.TestCase):
         req=urllib.request.Request(self.url+action, data=json.dumps(body).encode() if body is not None else None, headers={'Content-Type':'application/json', **({'X-CSRF-Token':self.csrf} if csrf and hasattr(self,'csrf') else {})})
         try: res=(client or self.client).open(req)
         except urllib.error.HTTPError as e: res=e
-        return res.status, json.loads(res.read())
+        try:
+            return res.status, json.loads(res.read())
+        finally:
+            res.close()
 
     def login(self):
         status,p=self.call('login',{'password':'test-password-long-enough'}); self.assertEqual(status,200); self.csrf=p['csrf']
@@ -74,7 +77,13 @@ class API(unittest.TestCase):
         code,view=self.call('preview&token='+link['token'],client=anon); self.assertEqual(code,200); self.assertNotIn('data',view)
         image=anon.open(self.url+'preview&image=1&token='+link['token'])
         self.assertEqual(image.headers['Content-Type'],'image/png')
-        self.assertEqual(image.read(),base64.b64decode(png))
+        self.assertEqual(image.read(),base64.b64decode(png)); image.close()
+        thumbnail=self.client.open(self.url+'thumbnail&id='+p['id'])
+        self.assertEqual(thumbnail.headers['Content-Type'],'image/png')
+        self.assertEqual(thumbnail.read(),base64.b64decode(png)); thumbnail.close()
+        with self.assertRaises(urllib.error.HTTPError) as denied:
+            anon.open(self.url+'thumbnail&id='+p['id'])
+        self.assertEqual(denied.exception.code,401); denied.exception.close()
         self.assertEqual(self.call('load&id='+p['id'],client=anon)[0],401)
         self.call('revoke',{'id':p['id']}); self.assertEqual(self.call('preview&token='+link['token'],client=anon)[0],404)
 
@@ -84,6 +93,7 @@ class API(unittest.TestCase):
         _,p=self.save(preview=png); _,link=self.call('share',{'id':p['id']})
         with sqlite3.connect(self.private/'projects.sqlite') as db:
             db.execute('UPDATE links SET expires=1 WHERE project=?',(p['id'],))
+        db.close()
         self.assertEqual(self.call('preview&token='+link['token'])[0],404)
         _,link=self.call('share',{'id':p['id']})
         self.assertEqual(self.save(id=p['id'],version=1)[0],200)

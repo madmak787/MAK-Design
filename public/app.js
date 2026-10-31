@@ -1,16 +1,108 @@
 'use strict';
 const $=id=>document.getElementById(id);
 let csrf='', active=null, pending=false, dirty=false, apiReady=null;
+let docSession=null, opening=false, currentDocId=null, nameDirty=false;
+let allProjects=[], fileFilter='recent', fileLayout='grid', syncing=false;
 const allowed=new Set(['node.create','node.set','text.create','text.set','text.style','shape.rectangle','shape.ellipse','frame.create','layout.add','layout.set','fill.add','fill.set','stroke.add','stroke.set','effect.add','transform.move','transform.resize','align.left','align.top']);
 function notice(message){$('notice').textContent=message;$('notice').hidden=false;}
 document.addEventListener('click',e=>{if(e.target!==$('notice')) $('notice').hidden=true;});
-function show(id){document.body.classList.toggle('editing',id==='work');for(const x of ['login','home','work','viewer']) $(x).hidden=x!==id;}
+function show(id){document.body.classList.toggle('editing',id==='work');document.body.classList.toggle('browsing',id==='home');document.body.classList.toggle('viewing',id==='viewer');for(const x of ['login','home','work','viewer']) $(x).hidden=x!==id;}
 async function request(action,body,query={}){const url=new URL('/api.php',location.origin);url.searchParams.set('action',action);for(const [k,v]of Object.entries(query))url.searchParams.set(k,v);const res=await fetch(url,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json','X-CSRF-Token':csrf}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});const value=await res.json();if(!res.ok)throw new Error(value.error||'Request failed.');return value;}
 function guard(fn){return async()=>{try{await fn();}catch(e){notice(e.message);}};}
-async function home(){const {projects}=await request('list');$('projects').replaceChildren();for(const p of projects){const card=document.createElement('article');card.className='project';const title=document.createElement('h2');title.textContent=p.name;const date=document.createElement('p');date.className='small muted';date.textContent='Saved '+new Date(p.updated).toLocaleString();const row=document.createElement('div');row.className='row';const open=document.createElement('button');open.textContent='Open design ↗';open.onclick=guard(()=>openProject(p.id));row.append(open);if(Number(p.links)){const revoke=document.createElement('button');revoke.textContent='Revoke client links';revoke.onclick=guard(async()=>{await request('revoke',{id:p.id});notice('Client links revoked.');await home();});row.append(revoke);}card.append(title,date,row);$('projects').append(card);}if(!projects.length){const empty=document.createElement('div');empty.className='empty';empty.textContent='Your next idea starts here. Create a design to begin.';$('projects').append(empty);}show('home');}
-async function editor(){if(apiReady)return apiReady;apiReady=new Promise((resolve,reject)=>{const frame=$('editor');let tries=0;frame.src='/editor/index.html?control';const timer=setInterval(()=>{if(frame.contentWindow?.figcraft){clearInterval(timer);frame.contentWindow.figcraft.execute('pref.publishServer',{url:''}).then(()=>resolve(frame.contentWindow.figcraft),reject);}else if(++tries>180){clearInterval(timer);apiReady=null;reject(new Error('The editor could not start. Try a current desktop browser with WebGL2 enabled.'));}},500);});return apiReady;}
-async function openProject(id){if(dirty && !confirm('Leave this design? Save it first to keep your changes on the server.'))return;active=null;show('work');notice('Opening your design…');const api=await editor();if(id){const p=await request('load',null,{id});await api.openFile(p.name+'.figcraft',Uint8Array.from(atob(p.data),c=>c.charCodeAt(0)));active={id:p.id,version:p.version};$('project-name').value=p.name;}else{await api.execute('file.new',{});$('project-name').value='Untitled design';}await api.execute('view.layers',{});await api.execute('view.design',{});await api.execute('view.zoomFit',{});dirty=true;$('notice').hidden=true;}
-async function save(){if(pending)return;pending=true;$('save').disabled=true;try{const api=await editor();const file=await api.execute('file.saveAs',{data:true});let preview='';let previewError='';try{const p=await api.execute('file.export',{format:'png',size:'1600w'});preview=p.data;}catch(e){previewError=e.message;}const p=await request('save',{id:active?.id||'',version:active?.version||0,name:$('project-name').value,data:file.data,preview});active={id:p.id,version:p.version};dirty=false;notice(previewError?'Design saved. Preview could not be updated: '+previewError:'Project and client preview saved.');}finally{pending=false;$('save').disabled=false;}}
+function element(tag, className, text) {
+  const el=document.createElement(tag); if(className)el.className=className;
+  if(text!==undefined)el.textContent=text; return el;
+}
+function renderFiles(){
+  const query=$('file-search').value.toLocaleLowerCase().trim();
+  let projects=allProjects.filter(p=>(fileFilter!=='shared'||Number(p.links)>0)&&p.name.toLocaleLowerCase().includes(query));
+  projects.sort($('file-sort').value==='name'?(a,b)=>a.name.localeCompare(b.name):(a,b)=>b.updated.localeCompare(a.updated));
+  $('files-heading').textContent={recent:'Recents',all:'All files',shared:'Shared with clients'}[fileFilter];
+  $('file-count').textContent=projects.length+' '+(projects.length===1?'file':'files');
+  $('projects').classList.toggle('list-layout',fileLayout==='list');
+  $('projects').replaceChildren();
+  for(const p of projects){
+    const card=element('article','project');
+    const preview=element('button','file-preview');preview.setAttribute('aria-label','Open '+p.name);
+    if(Number(p.hasPreview)){
+      const image=element('img');image.src='/api.php?action=thumbnail&id='+encodeURIComponent(p.id)+'&version='+p.version;
+      image.alt='';image.loading='lazy';preview.append(image);
+    }else preview.append(element('span','file-placeholder','✦'));
+    preview.onclick=guard(()=>openProject(p.id));
+    const info=element('div','file-info');
+    const open=element('button','file-name',p.name);open.onclick=guard(()=>openProject(p.id));
+    const date=element('p','small muted','Edited '+new Date(p.updated).toLocaleString());
+    info.append(open,date);
+    const row=element('div','row file-sharing');
+    row.append(element('span','file-badge',Number(p.links)?'Shared · '+p.links+' links':'Private'));
+    if(Number(p.links)){
+      const revoke=element('button','revoke-link','Revoke links');
+      revoke.onclick=guard(async()=>{await request('revoke',{id:p.id});notice('Client links revoked.');await home();});row.append(revoke);
+    }
+    info.append(row);card.append(preview,info);$('projects').append(card);
+  }
+  if(!projects.length){
+    const empty=element('div','empty');empty.append(element('span','empty-symbol','✦'),element('h2','',query?'No matching files':fileFilter==='shared'?'No shared files yet':'A fresh canvas awaits'),element('p','muted',query?'Try another file name.':fileFilter==='shared'?'Create a client preview link from the editor to see it here.':'Create a design to start making something good.'));
+    $('projects').append(empty);
+  }
+  document.querySelectorAll('[data-filter]').forEach(button=>{
+    if(button.dataset.filter===fileFilter)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+  });
+  $('grid-view').setAttribute('aria-pressed',String(fileLayout==='grid'));
+  $('list-view').setAttribute('aria-pressed',String(fileLayout==='list'));
+}
+async function home(){allProjects=(await request('list')).projects;renderFiles();show('home');}
+async function editor(){if(apiReady)return apiReady;apiReady=new Promise((resolve,reject)=>{const frame=$('editor');let tries=0;frame.src='/editor/index.html?control';const timer=setInterval(()=>{if(frame.contentWindow?.figcraft){clearInterval(timer);frame.contentWindow.figcraft.execute('pref.publishServer',{url:''}).then(()=>{docSession=new MakEditorSession(frame.contentWindow.figcraft);resolve(frame.contentWindow.figcraft);},reject);}else if(++tries>180){clearInterval(timer);apiReady=null;reject(new Error('The editor could not start. Try a current desktop browser with WebGL2 enabled.'));}},500);});return apiReady;}
+async function syncProjectState(){
+  if(!docSession||$('work').hidden||syncing||opening)return;
+  syncing=true;
+  try{
+    const state=await docSession.current();if(!state)return;
+    if(state.doc.id!==currentDocId){
+      currentDocId=state.doc.id;nameDirty=false;
+      $('project-name').value=state.project?.name||state.doc.name;
+    }
+    active=state.project;dirty=state.doc.dirty||nameDirty;
+    $('save-status').textContent=pending?'Saving…':dirty?'Unsaved changes':active?'Saved':'Draft';
+  }finally{syncing=false;}
+}
+async function openProject(id){
+  if(opening)return;
+  if(pending)throw new Error('Please wait for the current save to finish.');
+  if(dirty&&!confirm('Switch files? Your current design will stay open in its tab. Save first to keep it on the server.'))return;
+  opening=true;
+  try{
+    const project=id?await request('load',null,{id}):null;
+    show('work');notice('Opening your design…');const api=await editor();
+    const state=await docSession.open(project);
+    currentDocId=state.doc.id;active=state.project;nameDirty=false;dirty=state.doc.dirty;
+    $('project-name').value=active?.name||state.doc.name;
+    await api.execute('view.layers',{});await api.execute('view.design',{});await api.execute('view.zoomFit',{});
+    $('save-status').textContent=dirty?'Unsaved changes':active?'Saved':'Draft';$('notice').hidden=true;
+  }finally{opening=false;}
+}
+async function save(){
+  if(pending)return;
+  pending=true;$('save').disabled=true;$('save-status').textContent='Saving…';
+  try{
+    const api=await editor();const state=await docSession.current();if(!state)throw new Error('No active design.');
+    const name=$('project-name').value.trim();if(!name)throw new Error('Give this design a name.');
+    if(name!==state.doc.name)await api.execute('file.rename',{name});
+    const file=await api.execute('file.saveAs',{data:true});let preview='',previewError='';
+    try{preview=(await api.execute('file.export',{format:'png',size:'1600w'})).data;}catch(e){previewError=e.message;}
+    const p=await request('save',{id:state.project?.id||'',version:state.project?.version||0,name,data:file.data,preview});
+    await docSession.record({id:p.id,version:p.version,name},state.doc.id);
+    const now=await docSession.current();
+    if(now?.doc.id===state.doc.id){
+      active={id:p.id,version:p.version,name};nameDirty=$('project-name').value.trim()!==name;
+      // Edits made during the upload must not be marked as saved.
+      const latest=await api.execute('file.saveAs',{data:true});
+      if(latest.data===file.data)await api.execute('file.markSaved',{});
+      dirty=nameDirty||latest.data!==file.data;
+    }
+    notice(previewError?'Design saved. Preview could not be updated: '+previewError:'Project and client preview saved.');
+  }finally{pending=false;$('save').disabled=false;await syncProjectState();}
+}
 function download(name,data){const blob=new Blob([data],{type:'application/octet-stream'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 async function copy(text){try{await navigator.clipboard.writeText(text);notice('Copied to clipboard.');return true;}catch{const area=document.createElement('textarea');area.value=text;area.readOnly=true;$('notice').replaceChildren(area);$('notice').hidden=false;area.select();return false;}}
 async function share(){if(!active)throw new Error('Save your project and preview first.');const result=await request('share',{id:active.id});const copied=await copy(location.origin+'/#view='+result.token);if(copied)notice('Client preview link copied. It expires in 30 days. Revoke links from Projects.');}
@@ -27,8 +119,20 @@ $('layers-toggle').onclick=guard(async()=>{await (await editor()).execute('view.
 $('properties-toggle').onclick=guard(async()=>{await (await editor()).execute('view.design',{});});
 $('fullscreen').onclick=guard(async()=>{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else throw new Error('Use your browser’s fullscreen option on this device.');});
 $('copy-prompt').onclick=guard(copyPrompt);$('import').onclick=guard(()=>importCommands($('commands').value));$('starter').onclick=guard(()=>importCommands(JSON.stringify(sample)));
-$('project-name').oninput=()=>dirty=true;
-// Any canvas interaction can change the design; conservatively prompt before leaving.
-setInterval(()=>{try{if(!$('work').hidden && document.activeElement===$('editor'))dirty=true;}catch{}},1500);
+$('project-name').oninput=()=>{dirty=true;nameDirty=true;$('save-status').textContent='Unsaved changes';};
+document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{fileFilter=b.dataset.filter;renderFiles();});
+$('file-search').oninput=renderFiles;$('file-sort').onchange=renderFiles;
+$('grid-view').onclick=()=>{fileLayout='grid';renderFiles();};$('list-view').onclick=()=>{fileLayout='list';renderFiles();};
+document.querySelectorAll('[data-action]').forEach(button=>button.onclick=()=>{
+  button.closest('details').open=false;
+  const target={new:'new',save:'save',download:'download',share:'share',back:'back',fullscreen:'fullscreen'}[button.dataset.action];
+  if(target)$(target).click();
+});
+document.querySelectorAll('[data-command]').forEach(button=>button.onclick=guard(async()=>{
+  button.closest('details').open=false;await (await editor()).execute(button.dataset.command,{});await syncProjectState();
+}));
+document.addEventListener('click',event=>document.querySelectorAll('.command-menu[open]').forEach(menu=>{if(!menu.contains(event.target))menu.open=false;}));
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){toggleAI(false);document.querySelectorAll('.command-menu[open]').forEach(menu=>menu.open=false);}});
+setInterval(()=>syncProjectState().catch(()=>{}),800);
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 (async()=>{try{const token=new URLSearchParams(location.hash.slice(1)).get('view');if(token){$('logout').hidden=true;show('viewer');const p=await request('preview',null,{token});$('view-name').textContent=p.name;$('view-updated').textContent='Last saved '+new Date(p.updated).toLocaleString();$('view-image').src='/api.php?action=preview&image=1&token='+encodeURIComponent(token);return;}const s=await request('session');csrf=s.csrf;$('logout').hidden=!s.owner;if(s.owner)await home();else show('login');}catch(e){show('login');notice(e.message);}})();

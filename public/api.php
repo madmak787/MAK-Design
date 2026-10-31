@@ -59,6 +59,7 @@ if (empty($_SESSION['owner'])) fail('Please sign in.', 401);
 $_SESSION['last']=time();
 if ($action==='logout' && $method==='POST') { $_SESSION=[]; session_destroy(); reply(['ok'=>true]); }
 if ($action==='list' && $method==='GET') reply(['projects'=>$db->query('SELECT id,name,version,updated, preview IS NOT NULL AS hasPreview, (SELECT COUNT(*) FROM links WHERE project=projects.id AND expires>'.time().') AS links FROM projects ORDER BY updated DESC')->fetchAll(PDO::FETCH_ASSOC)]);
+if ($action==='thumbnail' && $method==='GET') { $p=project($db,(string)($_GET['id'] ?? '')); if (!$p['preview']) fail('No preview saved.',404); header('Content-Type: image/png'); echo $p['preview']; exit; }
 if ($action==='load' && $method==='GET') { $p=project($db,(string)($_GET['id'] ?? '')); reply(['id'=>$p['id'],'name'=>$p['name'],'data'=>base64_encode($p['data']),'version'=>(int)$p['version']]); }
 if ($action==='save' && $method==='POST') {
     $id=$body['id'] ?? ''; if (!is_string($id) || ($id!=='' && !preg_match('/^[a-f0-9]{32}$/D',$id))) fail('Invalid project.');
