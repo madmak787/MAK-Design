@@ -122,3 +122,44 @@ footer a { color: #934270; }
   .workbar button { padding: 10px; } .intro .primary { margin-top: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+
+/* The design workspace occupies the viewport; the editor owns its native sidebars. */
+.work-logo { display: none; }
+.work-actions, .panel-tools { display: flex; align-items: center; gap: 6px; }
+.ai-close { float: right; }
+body.editing { height: 100vh; height: 100dvh; overflow: hidden; background: #202023; }
+.editing > header, .editing > footer { display: none; }
+.editing > main { padding: 0; min-height: 0; height: 100%; }
+.editing #work { height: 100%; display: flex; flex-direction: column; }
+.editing .workbar {
+  flex: 0 0 54px; min-height: 54px; padding: 7px 12px; gap: 8px; flex-wrap: nowrap;
+  background: #29262d; border-bottom: 1px solid #45404b; color: #f8eff8;
+}
+.editing .work-logo { display: block; flex: 0 0 30px; }
+.editing .workbar button {
+  padding: 7px 10px; height: 34px; color: #efe6ef; background: transparent;
+  border-color: #514755; border-radius: 7px; font-size: 12px;
+}
+.editing .workbar button:hover { background: #443247; border-color: #b472a3; }
+.editing .workbar .primary { background: #ad2367; border-color: #c4397e; color: #fff; }
+.editing #project-name {
+  width: 220px; max-width: 300px; min-width: 110px; height: 34px;
+  color: #fff2fb; background: #342e38; border-color: #514755; padding: 7px 10px; font-size: 13px;
+}
+.editing .work-actions { margin-left: auto; }
+.editing .hint { display: none; }
+.editing .editor-layout { flex: 1 1 0; min-height: 0; position: relative; display: flex; gap: 0; }
+.editing #editor { display: block; flex: 1 1 0; min-width: 0; width: 100%; height: 100%; min-height: 0; border: 0; border-radius: 0; }
+.editing #ai {
+  position: absolute; inset: 0 0 0 auto; width: 350px; max-width: 92vw; max-height: none;
+  border: 0; border-left: 1px solid #dabed9; border-radius: 0; padding: 24px;
+  box-shadow: -12px 0 32px #170e202e; z-index: 2;
+}
+.editing #ai .ai-close { width: 30px; height: 30px; margin: -8px -8px 0 0; padding: 0; font-size: 24px; }
+@media (max-width: 900px) {
+  .editing .workbar { overflow-x: auto; scrollbar-width: thin; padding: 7px 8px; gap: 6px; }
+  .editing .workbar > *, .editing .work-actions, .editing .panel-tools { flex-shrink: 0; }
+  .editing #project-name { width: 155px; flex: 0 0 155px; }
+  .editing .workbar button { padding: 7px 8px; }
+  .editing .editor-layout { flex-direction: row; }
+}

@@ -6,6 +6,7 @@ The portal uses a vibrant floral palette (hibiscus, orchid, coral and marigold) 
 
 ## Features
 
+- A full-window editor with a compact toolbar, native layers/pages and design-property sidebars, optional browser fullscreen, and a dismissible AI drawer.
 - Manual design with FigCraft's layers, frames, typography, vectors and editor tools.
 - Private owner sign-in with a hashed password, secure HTTPS session cookies, CSRF protection, rate limiting and a 12-hour inactivity timeout.
 - Projects stored in SQLite **outside the public web directory**. Save/reopen the active design and download an editable `.figcraft` backup. Concurrent saves detect conflicts.
