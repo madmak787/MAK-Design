@@ -2,6 +2,8 @@
 
 A personal, login-protected design workspace for **design.khanamir.me**, made for Hostinger shared PHP hosting. It embeds the unmodified open-source **FigCraft 0.13.1** browser editor by the ArtCraft team, adding a separate MAK-branded project portal.
 
+The portal uses a vibrant floral palette (hibiscus, orchid, coral and marigold) and an original SVG blossom monogram in `public/logo.svg`, licensed with the portal additions.
+
 ## Features
 
 - Manual design with FigCraft's layers, frames, typography, vectors and editor tools.

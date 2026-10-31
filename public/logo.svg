@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <title>MAK Design blossom</title>
+  <g transform="translate(40 40)">
+    <ellipse cy="-20" rx="12" ry="19" fill="#F43E87"/>
+    <ellipse cy="-20" rx="12" ry="19" transform="rotate(60)" fill="#FF8555"/>
+    <ellipse cy="-20" rx="12" ry="19" transform="rotate(120)" fill="#FFBC42"/>
+    <ellipse cy="-20" rx="12" ry="19" transform="rotate(180)" fill="#F665A5"/>
+    <ellipse cy="-20" rx="12" ry="19" transform="rotate(240)" fill="#A670E8"/>
+    <ellipse cy="-20" rx="12" ry="19" transform="rotate(300)" fill="#D441A0"/>
+    <circle r="15" fill="#492047"/>
+    <path d="M-8 6V-6H-4L0 0L4-6H8V6H4V0L0 5L-4 0V6H-8Z" fill="#FFF9E8"/>
+  </g>
+</svg>
