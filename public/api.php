@@ -69,7 +69,7 @@ if ($action==='save' && $method==='POST') {
     $db->beginTransaction();
     if ($id!=='') {
         project($db,$id);
-        $q=$db->prepare('UPDATE projects SET name=?, data=?, preview=COALESCE(?,preview),version=version+1,updated=? WHERE id=? AND version=?');
+        $q=$db->prepare('UPDATE projects SET name=?, data=?, preview=?,version=version+1,updated=? WHERE id=? AND version=?');
         $q->execute([trim($name),$data,$preview,gmdate('c'),$id,(int)($body['version'] ?? 0)]);
         if ($q->rowCount()!==1) { $db->rollBack(); fail('A newer save exists. Download your current design, then reopen the saved project.',409); }
     } else {

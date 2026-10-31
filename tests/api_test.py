@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import sqlite3
 import subprocess
 import tempfile
 import time
@@ -71,7 +72,28 @@ class API(unittest.TestCase):
         _,p=self.save(preview=png); code,link=self.call('share',{'id':p['id']}); self.assertEqual(code,200)
         anon=urllib.request.build_opener()
         code,view=self.call('preview&token='+link['token'],client=anon); self.assertEqual(code,200); self.assertNotIn('data',view)
+        image=anon.open(self.url+'preview&image=1&token='+link['token'])
+        self.assertEqual(image.headers['Content-Type'],'image/png')
+        self.assertEqual(image.read(),base64.b64decode(png))
         self.assertEqual(self.call('load&id='+p['id'],client=anon)[0],401)
         self.call('revoke',{'id':p['id']}); self.assertEqual(self.call('preview&token='+link['token'],client=anon)[0],404)
+
+    def test_expiry_and_missing_preview(self):
+        self.login()
+        png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS7sAAAAASUVORK5CYII='
+        _,p=self.save(preview=png); _,link=self.call('share',{'id':p['id']})
+        with sqlite3.connect(self.private/'projects.sqlite') as db:
+            db.execute('UPDATE links SET expires=1 WHERE project=?',(p['id'],))
+        self.assertEqual(self.call('preview&token='+link['token'])[0],404)
+        _,link=self.call('share',{'id':p['id']})
+        self.assertEqual(self.save(id=p['id'],version=1)[0],200)
+        self.assertEqual(self.call('preview&token='+link['token'])[0],404)
+        self.assertEqual(self.call('share',{'id':p['id']})[0],400)
+
+    def test_z_login_rate_limit(self):
+        for _ in range(8):
+            code,_=self.call('login',{'password':'incorrect'})
+            self.assertIn(code,(401,429))
+        self.assertEqual(self.call('login',{'password':'test-password-long-enough'})[0],429)
 
 if __name__=='__main__': unittest.main(verbosity=2)
