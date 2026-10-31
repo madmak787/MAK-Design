@@ -5,6 +5,8 @@ from pathlib import Path
 import urllib.request
 import zipfile
 import sys
+import calendar
+import os
 
 VERSION = '0.13.1'
 SHA256 = 'fc2cb8d8fa6b8c3846514f064fc18a5acd3a228609a5cf7332b9f6555057999c'
@@ -28,6 +30,8 @@ with zipfile.ZipFile(io.BytesIO(archive)) as z:
         out = dest / relative
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(z.read(item))
+        modified=calendar.timegm((*item.date_time,0,0,0))
+        os.utime(out,(modified,modified))
 (dest / '.htaccess').write_text('''Options -Indexes
 AddType application/wasm .wasm
 <IfModule mod_headers.c>

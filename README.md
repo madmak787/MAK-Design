@@ -6,6 +6,7 @@ The portal uses a vibrant floral palette (hibiscus, orchid, coral and marigold) 
 
 ## Features
 
+- A compact floral file browser with sidebar navigation, private thumbnails, search, sorting, grid/list layouts and a client-shared view.
 - A full-window editor with a compact toolbar, native layers/pages and design-property sidebars, optional browser fullscreen, and a dismissible AI drawer.
 - Manual design with FigCraft's layers, frames, typography, vectors and editor tools.
 - Private owner sign-in with a hashed password, secure HTTPS session cookies, CSRF protection, rate limiting and a 12-hour inactivity timeout.
@@ -14,6 +15,8 @@ The portal uses a vibrant floral palette (hibiscus, orchid, coral and marigold) 
 - AI-assisted design through a prompt/reply handoff: copy the prompt to your AI app, paste its JSON reply and add editable layers as one undo step. No API key, automatic AI calls or paid fallback. The allowed drawing commands are listed in `public/app.js`.
 
 This is a personal portal around an alpha editor, not a full Figma replacement. It does not add live multiplayer, interactive client prototypes, client accounts or a built-in AI model. The vendor editor keeps its FigCraft identity and credits. MAK branding belongs to the surrounding portal; no endorsement by the ArtCraft team is implied. An Apache content policy prevents the hosted editor from connecting to external collaboration servers. Use the portal's **Client link** button for sharing.
+
+New designs reuse FigCraft’s untouched startup document, rather than opening a second Untitled tab. Opening a saved design removes that blank starter only if it has no changes. Recovered and edited tabs stay open. Cloud save associations follow each native editor tab.
 
 ## Local setup
 
@@ -25,6 +28,7 @@ python3 scripts/prepare-editor.py
 php scripts/configure.php /absolute/path/outside-the-web-root
 MAK_PRIVATE_DIR=/absolute/path/outside-the-web-root php -S 127.0.0.1:8873 -t public
 python3 tests/api_test.py
+node --test tests/editor-session.test.cjs
 ```
 
 `configure.php` reads the password until stdin closes and refuses to replace existing credentials. Keep the password in your password manager. The development server does not implement `.htaccess`; test the network policy on Apache/LiteSpeed in production.
