@@ -1,0 +1,6 @@
+public/editor/
+private/*
+!private/.gitkeep
+.local-access.md
+*.sqlite*
+dist/
