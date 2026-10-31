@@ -20,9 +20,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: storytold/craft-fonts
+          ref: aced4137c022f1f587624d48e81ec77e1914a9cc
           path: craft-fonts
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
@@ -35,7 +36,7 @@ jobs:
           mkdir -p /tmp/mak-trunk
           gh release download v0.22.1 -R trunk-rs/trunk -p trunk-x86_64-unknown-linux-gnu.tar.gz -p trunk-x86_64-unknown-linux-gnu.tar.gz.sha256 -D /tmp/mak-trunk
           cd /tmp/mak-trunk
-          sha256sum -c trunk-x86_64-unknown-linux-gnu.tar.gz.sha256
+          python3 -c "import hashlib,pathlib; p=pathlib.Path('trunk-x86_64-unknown-linux-gnu.tar.gz'); assert hashlib.sha256(p.read_bytes()).hexdigest()==pathlib.Path(str(p)+'.sha256').read_text().split()[0]"
           tar -xzf trunk-x86_64-unknown-linux-gnu.tar.gz
           sudo install trunk /usr/local/bin/trunk
       - name: Apply source theme and verify startup regression tests
@@ -49,13 +50,24 @@ jobs:
         run: trunk build --release --locked
       - name: Package editor with notices and source patch
         run: |
-          mkdir -p bundle/editor
-          cp -R vendor-source/dist/web/. bundle/editor/
-          cp vendor-source/LICENSE-MIT vendor-source/LICENSE-APACHE vendor-source/NOTICE vendor-source/ATTRIBUTION.md bundle/editor/
-          cp scripts/theme-editor.py bundle/
-          cp FONT-SOURCE.txt bundle/
-          find craft-fonts -name 'OFL*.txt' -exec cp -n {} bundle/editor/ \;
-          printf '%s\n' 'Modified UI theme for MAK Design. Based on FigCraft v0.13.1, upstream source commit 76f520ffaaab73fcacf14dfaf30f29272ec178cb. UI palette modified; document paint unchanged. Reproduce using scripts/theme-editor.py and this workflow.' > bundle/BUILD-NOTICE.txt
+          mkdir -p bundle/mak-floral-editor-v1
+          cp -R vendor-source/dist/web/. bundle/mak-floral-editor-v1/
+          cp vendor-source/LICENSE-MIT vendor-source/LICENSE-APACHE vendor-source/NOTICE vendor-source/ATTRIBUTION.md bundle/mak-floral-editor-v1/
+          cp scripts/theme-editor.py bundle/mak-floral-editor-v1/
+          cp FONT-SOURCE.txt bundle/mak-floral-editor-v1/
+          python3 - <<'PYLICENSE'
+          from pathlib import Path
+          import shutil
+          root=Path('craft-fonts')
+          dest=Path('bundle/mak-floral-editor-v1/notices/fonts')
+          for file in root.rglob('*'):
+              if file.is_file() and (file.name.startswith('OFL') or file.name.startswith('LICENSE')):
+                  out=dest/file.relative_to(root)
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(file,out)
+          shutil.copy2(root/'ATTRIBUTION.md','bundle/mak-floral-editor-v1/FONTS-ATTRIBUTION.md')
+          PYLICENSE
+          printf '%s\n' 'Modified UI theme for MAK Design. Based on FigCraft v0.13.1, upstream source commit 76f520ffaaab73fcacf14dfaf30f29272ec178cb. UI palette modified; document paint unchanged. Reproduce using scripts/theme-editor.py and this workflow.' > bundle/mak-floral-editor-v1/BUILD-NOTICE.txt
           cd bundle
           zip -qr ../mak-floral-editor-v1.zip .
           cd ..

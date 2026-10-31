@@ -21,3 +21,39 @@ for name,palette,next_marker in [('light',light,'    pub fn dark()'),('dark',dar
     s=s[:start]+block+s[end:]
 p.write_text(s)
 print('MAK floral light/dark UI themes applied. Design document colours are unchanged.')
+# Original vector blossom drawn from primitives; no external product artwork.
+s=p.read_text().replace('"Fig".into(), font.clone()', '"MAK".into(), font.clone()').replace('"Craft", font, t.accent_text', '" Design", font, t.accent_text')
+start=s.index('pub fn paint_app_icon(')
+end=s.index('\npub fn regular(',start)
+s=s[:start]+'''pub fn paint_app_icon(ui: &egui::Ui, rect: egui::Rect) {
+    let scale = rect.width().min(rect.height()) / 80.0;
+    let center = rect.center();
+    let colors = [
+        Color32::from_rgb(0xF4, 0x3E, 0x87),
+        Color32::from_rgb(0xFF, 0x85, 0x55),
+        Color32::from_rgb(0xFF, 0xBC, 0x42),
+        Color32::from_rgb(0xF6, 0x65, 0xA5),
+        Color32::from_rgb(0xA6, 0x70, 0xE8),
+        Color32::from_rgb(0xD4, 0x41, 0xA0),
+    ];
+    for (index, color) in colors.into_iter().enumerate() {
+        let angle = index as f32 * std::f32::consts::TAU / 6.0;
+        let (sin, cos) = angle.sin_cos();
+        let points = (0..24).map(|step| {
+            let t = step as f32 * std::f32::consts::TAU / 24.0;
+            let x = 12.0 * t.cos();
+            let y = -20.0 + 19.0 * t.sin();
+            center + egui::vec2((x * cos - y * sin) * scale, (x * sin + y * cos) * scale)
+        }).collect();
+        ui.painter().add(egui::Shape::convex_polygon(points, color, Stroke::NONE));
+    }
+    ui.painter().circle_filled(center, 15.0 * scale, Color32::from_rgb(0x49, 0x20, 0x47));
+    ui.painter().text(center, egui::Align2::CENTER_CENTER, "M", semibold(19.0 * scale), Color32::from_rgb(0xFF, 0xF9, 0xE8));
+}
+''' + s[end:]
+p.write_text(s)
+about=root/'crates/ui-egui/src/dialogs.rs'
+s=about.read_text().replace('Interface design and prototyping. A free, open-source, clean-room design tool written from scratch in Rust, part of the ArtCraft Crafting Apps.', 'MAK Design personal workspace. Based on the open-source FigCraft engine by the ArtCraft team and community.').replace('Dual-licensed MIT OR Apache-2.0. Made by the ArtCraft team and community.', 'FigCraft engine: MIT OR Apache-2.0. MAK Design customizations by madmak787.')
+about.write_text(s)
+index=root/'apps/figcraft-web/index.html'
+index.write_text(index.read_text().replace('<title>FigCraft</title>','<title>MAK Design editor</title>').replace('Loading FigCraft&hellip;', 'Loading MAK Design&hellip;'))

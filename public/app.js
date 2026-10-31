@@ -52,7 +52,7 @@ function renderFiles(){
   $('list-view').setAttribute('aria-pressed',String(fileLayout==='list'));
 }
 async function home(){allProjects=(await request('list')).projects;renderFiles();show('home');}
-async function editor(){if(apiReady)return apiReady;apiReady=new Promise((resolve,reject)=>{const frame=$('editor');let tries=0;frame.src='/editor/index.html?control';const timer=setInterval(()=>{if(frame.contentWindow?.figcraft){clearInterval(timer);frame.contentWindow.figcraft.execute('pref.publishServer',{url:''}).then(()=>{docSession=new MakEditorSession(frame.contentWindow.figcraft);resolve(frame.contentWindow.figcraft);},reject);}else if(++tries>180){clearInterval(timer);apiReady=null;reject(new Error('The editor could not start. Try a current desktop browser with WebGL2 enabled.'));}},500);});return apiReady;}
+async function editor(){if(apiReady)return apiReady;apiReady=new Promise((resolve,reject)=>{const frame=$('editor');let tries=0;frame.src='/editor/index.html?control&build=mak-floral-1';const timer=setInterval(()=>{if(frame.contentWindow?.figcraft){clearInterval(timer);frame.contentWindow.figcraft.execute('pref.publishServer',{url:''}).then(()=>{docSession=new MakEditorSession(frame.contentWindow.figcraft);resolve(frame.contentWindow.figcraft);},reject);}else if(++tries>180){clearInterval(timer);apiReady=null;reject(new Error('The editor could not start. Try a current desktop browser with WebGL2 enabled.'));}},500);});return apiReady;}
 async function syncProjectState(){
   if(!docSession||$('work').hidden||syncing||opening)return;
   syncing=true;
